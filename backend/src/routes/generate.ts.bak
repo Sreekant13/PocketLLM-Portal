@@ -1,0 +1,80 @@
+import { FastifyInstance } from 'fastify';
+import crypto from 'crypto';
+import * as cache from '../services/cache';
+import { generateOnce, generateStream } from '../services/modelRunner';
+import { recGenerate, recStream } from '../services/metrics';
+
+export default async function (f: FastifyInstance) {
+
+  f.post('/api/v1/generate', async (req, res) => {
+    const started = process.hrtime.bigint();
+
+    const { prompt, settings } = (req.body as any);
+    const key = crypto.createHash('sha1').update(JSON.stringify({ prompt, settings })).digest('hex');
+    const hit = cache.get(key) as { value: string } | undefined;
+
+    if (hit?.value) {
+      const elapsed = Number(process.hrtime.bigint() - started) / 1e6;
+      recGenerate(elapsed, true);
+      return { completion: JSON.parse(hit.value), cacheHit: true };
+    }
+
+    const completion = await generateOnce(prompt);
+    const body = { text: completion };
+    cache.put(key, JSON.stringify(body));
+
+    const elapsed = Number(process.hrtime.bigint() - started) / 1e6;
+    recGenerate(elapsed, false);
+    return { completion: body, cacheHit: false };
+  });
+
+  f.get('/api/v1/stream', async (req, res) => {
+    const prompt = (req.query as any).prompt || '';
+    const started = process.hrtime.bigint();
+    let firstTokenAt: bigint | null = null;
+
+    res.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    });
+
+    for await (const token of generateStream(prompt)) {
+      if (!firstTokenAt) firstTokenAt = process.hrtime.bigint();
+      res.raw.write(`data: ${token}\n\n`);
+    }
+    res.raw.end();
+
+    const end = process.hrtime.bigint();
+    const ttftMs = firstTokenAt ? Number(firstTokenAt - started) / 1e6 : Number(end - started) / 1e6;
+    const totalMs = Number(end - started) / 1e6;
+    recStream(ttftMs, totalMs);
+  });
+}
+
+// import { FastifyInstance } from 'fastify';
+// import crypto from 'crypto';
+// import * as cache from '../services/cache';
+// import { generateOnce, generateStream } from '../services/modelRunner';
+// import { recGenerate, recStream } from '../services/metrics';
+
+// export default async function (f: FastifyInstance) {
+//   f.post('/api/v1/generate', async (req, res) => {
+//     const { prompt, settings } = (req.body as any);
+//     const key = crypto.createHash('sha1').update(JSON.stringify({prompt,settings})).digest('hex');
+//     const hit = cache.get(key) as { value: string } | undefined;
+//     if (hit?.value) {
+//         return { completion: JSON.parse(hit.value), cacheHit: true };
+//     }
+//     const completion = await generateOnce(prompt);
+//     cache.put(key, JSON.stringify({ text: completion }));
+//     return { completion: { text: completion }, cacheHit: false };
+//   });
+
+//   f.get('/api/v1/stream', async (req, res) => {
+//     const prompt = (req.query as any).prompt || '';
+//     res.raw.writeHead(200, {'Content-Type': 'text/event-stream','Cache-Control': 'no-cache', Connection: 'keep-alive'});
+//     for await (const token of generateStream(prompt)) res.raw.write(`data: ${token}\n\n`);
+//     res.raw.end();
+//   });
+// }
