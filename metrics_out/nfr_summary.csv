@@ -1,0 +1,5 @@
+﻿"Scenario","p50","p95","p99","Notes"
+"Single (MISS)","688.5058","1376.9421","1376.9421","Cache swept prior to calls"
+"Single (HIT)","0.0962","0.207","0.2138","Pure hits (warm+reset before loop)"
+"Stream TTFT","0.0829","0.2089","0.2089","Time to first SSE token"
+"Stream Total","687.0872","1382.9929","1382.9929","Full stream duration"

@@ -1,0 +1,20 @@
+{
+    "generate":  {
+                     "count":  0,
+                     "cacheHit":  0,
+                     "cacheMiss":  0,
+                     "p50":  0,
+                     "p95":  0,
+                     "p99":  0
+                 },
+    "stream":  {
+                   "count":  15,
+                   "ttft_p50":  0.0829,
+                   "ttft_p95":  0.2089,
+                   "ttft_p99":  0.2089,
+                   "total_p50":  687.0872,
+                   "total_p95":  1382.9929,
+                   "total_p99":  1382.9929
+               },
+    "cacheHitRate":  0
+}
